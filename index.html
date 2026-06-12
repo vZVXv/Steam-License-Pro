@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Steam License Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #1b2838;
+            --bg-panel: #2a475e;
+            --bg-dark: #171a21;
+            --text-main: #c7d5e0;
+            --steam-blue: #66c0f4;
+            --steam-light-blue: #3d6b8d;
+            --steam-green: #a4d007;
+            --steam-red: #ac3442;
+            --steam-purple: #84319b;
+            --steam-orange: #ffb01f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        h1 { color: #fff; margin-bottom: 5px; }
+        .subtitle { color: var(--steam-light-blue); margin-top: 0; margin-bottom: 30px; }
+
+        /* Кнопки */
+        .btn {
+            background: var(--steam-light-blue);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: 0.2s;
+        }
+        .btn:hover { background: var(--steam-blue); color: var(--bg-main); }
+        .btn-green { background: var(--steam-green); color: #000; font-weight: bold; }
+        .btn-green:hover { background: #8bb306; }
+        
+        /* Зона загрузки файла */
+        .upload-area {
+            background: rgba(42, 71, 94, 0.4);
+            border: 2px dashed var(--steam-light-blue);
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-bottom: 25px;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            background: rgba(102, 192, 244, 0.15);
+            border-color: var(--steam-blue);
+        }
+        .upload-area input { display: none; }
+        .upload-icon { font-size: 3em; margin-bottom: 10px; display: block; }
+
+        /* Дашборд: Карточки */
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .stat-card {
+            background: var(--bg-dark);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .stat-card.blue { border-left: 4px solid var(--steam-blue); }
+        .stat-card.green { border-left: 4px solid var(--steam-green); }
+        .stat-card.orange { border-left: 4px solid var(--steam-orange); }
+        .stat-card.purple { border-left: 4px solid var(--steam-purple); }
+        
+        .stat-card h4 { margin: 0 0 10px 0; color: #8f98a0; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card .value { font-size: 1.8em; color: #fff; font-weight: bold; }
+
+        /* Графики */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .chart-box {
+            background: var(--bg-dark);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--steam-light-blue);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        @media (max-width: 900px) {
+            .charts-container { grid-template-columns: 1fr; }
+        }
+
+        /* Таблицы */
+        .panel {
+            background: var(--bg-dark);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid var(--steam-light-blue);
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { color: var(--steam-blue); padding: 12px; border-bottom: 2px solid var(--steam-light-blue); font-size: 0.85em; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid var(--bg-panel); font-size: 0.95em; vertical-align: middle; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        .total-row td { background: rgba(102, 192, 244, 0.1); font-weight: bold; color: #fff; border-bottom: 2px solid var(--steam-blue) !important; }
+        .clickable-cell { cursor: pointer; border-bottom: 1px dotted var(--steam-blue); transition: 0.2s; display: inline-block; margin-bottom: 2px;}
+        .clickable-cell:hover { color: #fff; }
+        
+        /* Теги и цвета текста */
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; color: #fff; display: inline-block; text-align: center; min-width: 90px;}
+        
+        /* Модальное окно */
+        #instructionsModal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--bg-dark); border: 1px solid var(--steam-blue); padding: 30px; border-radius: 12px;
+            z-index: 1000; width: 90%; max-width: 650px; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        #overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 999; backdrop-filter: blur(3px);
+        }
+        code { background: #000; color: var(--steam-green); padding: 15px; display: block; border-radius: 6px; font-size: 0.85em; white-space: pre-wrap; word-wrap: break-word; max-height: 250px; overflow-y: auto; border: 1px solid #333; }
+        
+        /* Легенда распродаж */
+        .sale-month { background: rgba(164, 208, 7, 0.08) !important; border-left: 3px solid var(--steam-green); }
+        .sale-icon { margin-right: 8px; filter: drop-shadow(0 0 2px rgba(255,255,255,0.3)); }
+        
+        .filter-status { background: var(--steam-blue); color: var(--bg-dark); padding: 5px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin-bottom: 15px; display: inline-block; cursor: pointer;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Steam License Viewer</h1>
+        <p class="subtitle">Анализ вашей библиотеки лицензий и подписок Steam</p>
+
+        <button class="btn" onclick="toggleInstructions()" style="margin-bottom: 20px;">
+            ❓ Инструкция: Как получить свой JSON?
+        </button>
+
+        <div id="instructionsModal">
+            <h2 style="color: var(--steam-blue); margin-top: 0;">Как выгрузить лицензии из Steam</h2>
+            <ol style="line-height: 1.6; padding-left: 20px;">
+                <li>Откройте <a href="https://store.steampowered.com/account/licenses/" target="_blank" style="color: #fff;">Лицензии и активации ключей</a> в браузере.</li>
+                <li>Нажмите <kbd>F12</kbd> (или ПКМ -> Исследовать элемент) и откройте вкладку <b>Console</b>.</li>
+                <li>Вставьте код ниже и нажмите <kbd>Enter</kbd>. Он автоматически соберет все лицензии на странице.</li>
+                <li>Перетащите скачанный файл <b>steam_licenses.json</b> в окно ниже.</li>
+            </ol>
+            <code>
+(function() {
+    // Находим все строки таблицы с атрибутом data-panel
+    const rows = document.querySelectorAll('tr[data-panel]');
+    const licenses = [];
+
+    rows.forEach(row => {
+        // Ищем нужные колонки внутри строки
+        const dateEl = row.querySelector('.license_date_col');
+        const methodEl = row.querySelector('.license_acquisition_col');
+        const tds = row.querySelectorAll('td');
+
+        // Проверяем, что нужные элементы существуют и колонок не меньше трех
+        if (dateEl && methodEl && tds.length >= 3) {
+            const date = dateEl.innerText.trim();
+            const name = tds[1].innerText.trim(); // Название всегда во второй колонке
+            const method = methodEl.innerText.trim();
+
+            licenses.push({
+                date: date,
+                name: name,
+                method: method
+            });
+        }
+    });
+
+    // Если ничего не найдено, выводим предупреждение
+    if (licenses.length === 0) {
+        console.warn("Лицензии не найдены! Убедитесь, что вы находитесь на нужной странице.");
+        return;
+    }
+
+    // Преобразуем массив объектов в красиво отформатированный JSON
+    const jsonString = JSON.stringify(licenses, null, 2);
+
+    // Создаем Blob (файл) из строки
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    // Создаем невидимую ссылку для скачивания
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "steam_licenses.json"; // Имя итогового файла
+    
+    // Эмулируем клик для старта загрузки
+    document.body.appendChild(a);
+    a.click();
+    
+    // Убираем за собой
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log(`✅ Сбор завершен! Найдено лицензий: ${licenses.length}. Скачивание файла началось...`);
+})();
+            </code>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-green" style="flex: 1;" onclick="copyScript()">📋 Скопировать код</button>
+                <button class="btn" style="background: var(--steam-red); flex: 1;" onclick="toggleInstructions()">Закрыть</button>
+            </div>
+        </div>
+        <div id="overlay" onclick="toggleInstructions()"></div>
+
+        <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <span class="upload-icon">📂</span>
+            <h3>Перетащите JSON файл лицензий сюда</h3>
+            <p style="color: var(--steam-light-blue); margin-top: 5px;">или кликните для выбора файла</p>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+
+        <div id="results" style="display:none;">
+            
+            <div class="dashboard-cards">
+                <div class="stat-card blue">
+                    <h4>Всего лицензий</h4>
+                    <div class="value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card green">
+                    <h4>Магазин Steam</h4>
+                    <div class="value" id="statStore">0</div>
+                </div>
+                <div class="stat-card orange">
+                    <h4>Активации (Розница)</h4>
+                    <div class="value" id="statRetail">0</div>
+                </div>
+                <div class="stat-card purple">
+                    <h4>Подарки</h4>
+                    <div class="value" id="statGift">0</div>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-box">
+                    <h4 style="margin-top: 0; color: var(--steam-blue);">Динамика получения игр по годам</h4>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <h4 style="margin-top: 0; color: var(--steam-blue);">Методы получения</h4>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="doughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 style="margin-top: 0; color: var(--steam-blue); display: flex; justify-content: space-between; align-items: center;">
+                    Сводная статистика по годам и месяцам
+                    <span style="font-size: 0.65em; color: #888; font-weight: normal; background: #000; padding: 4px 8px; border-radius: 4px;">
+                        Кликните на цифру, чтобы отфильтровать детальную историю ниже 👇
+                    </span>
+                </h3>
+
+                <div id="saleLegend" style="margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 4px; border: 1px solid #3d6b8d; font-size: 0.85em;">
+                    <div style="color: #66c0f4; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9em;">
+                        Сезоны распродаж
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><span class="sale-icon">❄️</span> <span style="color:#66c0f4">Зимняя</span></div>
+                        <div><span class="sale-icon">🌱</span> <span style="color:#a4d007">Весенняя</span></div>
+                        <div><span class="sale-icon">☀️</span> <span style="color:#ffb01f">Летняя</span></div>
+                        <div><span class="sale-icon">🍂</span> <span style="color:#e9684c">Осенняя</span></div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Период</th>
+                            <th>Всего</th>
+                            <th>Магазин Steam</th>
+                            <th>Бесплатно</th>
+                            <th>Розница (Ключи)</th>
+                            <th>Подарки</th>
+                        </tr>
+                    </thead>
+                    <tbody id="yearTableBody"></tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+                <h3 style="color: var(--steam-blue); margin: 0;">Детальная история лицензий</h3>
+                <div id="activeFilter" class="filter-status" style="display: none;" onclick="renderHistory(allData)">
+                    Показан фильтр: <span></span> ✖ (Сбросить)
+                </div>
+            </div>
+            <div class="panel" style="padding: 0;">
+                <table style="margin: 0;">
+                    <thead style="background: #000; position: sticky; top: 0;">
+                        <tr>
+                            <th style="padding-left: 20px; width: 150px;">Дата</th>
+                            <th style="width: 200px;">Метод получения</th>
+                            <th>Продукт</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mainTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => analyze(JSON.parse(event.target.result));
+            reader.readAsText(file);
+        }
+
+        function toggleInstructions() {
+            const modal = document.getElementById('instructionsModal');
+            const overlay = document.getElementById('overlay');
+            const isVisible = modal.style.display === 'block';
+            modal.style.display = isVisible ? 'none' : 'block';
+            overlay.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function copyScript() {
+            navigator.clipboard.writeText(document.querySelector('code').innerText).then(() => {
+                alert('Скрипт скопирован в буфер обмена!');
+            });
+        }
+
+        let allData = [];
+        let globalOverall = { total: 0, store: 0, free: 0, retail: 0, gift: 0, other: 0 };
+        let globalYearly = {};
+        let barChartInstance = null;
+        let pieChartInstance = null;
+
+        function analyze(data) {
+            allData = data;
+            document.getElementById('dropZone').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+            
+            processData(data);
+            renderDashboard();
+            renderSummaryTable();
+            renderHistory(allData);
+        }
+
+        function processData(data) {
+            globalOverall = { total: 0, store: 0, free: 0, retail: 0, gift: 0, other: 0 };
+            globalYearly = {};
+
+            data.forEach(item => {
+                if (!item.date || !item.name) return;
+
+                // Парсинг года (ищем 4 цифры подряд)
+                const yearMatch = item.date.match(/(\d{4})/);
+                const year = yearMatch ? yearMatch[1] : "Неизвестно";
+                
+                // Парсинг месяца (разбиваем строку и берем второй элемент)
+                const dateParts = item.date.split(' ');
+                let monthRaw = dateParts.length >= 2 ? dateParts[1].replace(/\./g, '').replace(/,/g, '') : "Прочее";
+                const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
+                
+                const method = (item.method || "").trim();
+                let cleanName = item.name.replace(/^Удалить\n/g, '').trim();
+
+                let cat = 'other';
+                if (method.includes('Магазин Steam')) cat = 'store';
+                else if (method.includes('Бесплатно')) cat = 'free';
+                else if (method.includes('Подарок') || method.includes('гостевой')) cat = 'gift';
+                else if (method.includes('Розница')) cat = 'retail';
+
+                item._parsed = { year, month, category: cat, cleanName, originalMethod: method };
+
+                if (!globalYearly[year]) {
+                    globalYearly[year] = { total: 0, store: 0, free: 0, retail: 0, gift: 0, other: 0, months: {} };
+                }
+                if (!globalYearly[year].months[month]) {
+                    globalYearly[year].months[month] = { total: 0, store: 0, free: 0, retail: 0, gift: 0, other: 0 };
+                }
+
+                globalOverall.total++; globalOverall[cat]++;
+                
+                globalYearly[year].total++; globalYearly[year][cat]++;
+                globalYearly[year].months[month].total++; globalYearly[year].months[month][cat]++;
+            });
+        }
+
+        function renderDashboard() {
+            document.getElementById('statTotal').innerText = globalOverall.total;
+            document.getElementById('statStore').innerText = globalOverall.store;
+            document.getElementById('statRetail').innerText = globalOverall.retail;
+            document.getElementById('statGift').innerText = globalOverall.gift;
+
+            const years = Object.keys(globalYearly).filter(y => y !== "Неизвестно").sort((a,b) => a - b);
+            
+            const storeData = years.map(y => globalYearly[y].store);
+            const freeData = years.map(y => globalYearly[y].free);
+            const retailData = years.map(y => globalYearly[y].retail);
+            const giftData = years.map(y => globalYearly[y].gift);
+            
+            Chart.defaults.color = '#8f98a0';
+            Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+            if (barChartInstance) barChartInstance.destroy();
+            barChartInstance = new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [
+                        { label: 'Магазин', data: storeData, backgroundColor: '#66c0f4', borderRadius: 4 },
+                        { label: 'Бесплатно', data: freeData, backgroundColor: '#a4d007', borderRadius: 4 },
+                        { label: 'Розница', data: retailData, backgroundColor: '#ffb01f', borderRadius: 4 },
+                        { label: 'Подарки', data: giftData, backgroundColor: '#84319b', borderRadius: 4 }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: true, labels: { color: '#c7d5e0' } },
+                        tooltip: { mode: 'index', intersect: false }
+                    }, 
+                    scales: { 
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' } }, 
+                        x: { grid: { display: false } } 
+                    } 
+                }
+            });
+
+            const pieData = [globalOverall.store, globalOverall.free, globalOverall.retail, globalOverall.gift];
+
+            if (pieChartInstance) pieChartInstance.destroy();
+            pieChartInstance = new Chart(document.getElementById('doughnutChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Магазин', 'Бесплатно', 'Розница', 'Подарки'],
+                    datasets: [{
+                        data: pieData,
+                        backgroundColor: ['#66c0f4', '#a4d007', '#ffb01f', '#84319b'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#c7d5e0' } } }, cutout: '70%' }
+            });
+        }
+
+        function renderSummaryTable() {
+            const fmt = (val, year, month, cat, label) => {
+                if (val === 0) return `<div style="color: #444;">0</div>`;
+                return `<div class="clickable-cell" onclick="event.stopPropagation(); setFilter('${year || ''}', '${month || ''}', '${cat || ''}', '${label}')" title="Нажмите для фильтрации">${val}</div>`;
+            };
+
+            const yearBody = document.getElementById('yearTableBody');
+            yearBody.innerHTML = "";
+
+            yearBody.innerHTML += `<tr class="total-row">
+                <td onclick="setFilter('','', '', 'Все время')" style="cursor:pointer; color:var(--steam-blue);">ВСЁ ВРЕМЯ</td>
+                <td>${fmt(globalOverall.total, null, null, 'total', 'Все лицензии')}</td>
+                <td>${fmt(globalOverall.store, null, null, 'store', 'Магазин Steam (Все)')}</td>
+                <td>${fmt(globalOverall.free, null, null, 'free', 'Бесплатно (Все)')}</td>
+                <td>${fmt(globalOverall.retail, null, null, 'retail', 'Розница (Все)')}</td>
+                <td>${fmt(globalOverall.gift, null, null, 'gift', 'Подарки (Все)')}</td>
+            </tr>`;
+
+            Object.keys(globalYearly).sort((a, b) => b - a).forEach(y => {
+                const data = globalYearly[y];
+                yearBody.innerHTML += `<tr onclick="toggleMonths('${y}')" style="cursor:pointer; background: rgba(0,0,0,0.15);">
+                    <td style="color:var(--steam-blue); font-weight:bold;">
+                        <span class="clickable-cell" onclick="event.stopPropagation(); setFilter('${y}', null, null, 'Год ${y}')">${y}</span> <span style="font-size:0.7em">▼</span>
+                    </td>
+                    <td style="font-weight:bold;">${fmt(data.total, y, null, 'total', y + ' - Все')}</td>
+                    <td>${fmt(data.store, y, null, 'store', y + ' - Магазин')}</td>
+                    <td>${fmt(data.free, y, null, 'free', y + ' - Бесплатно')}</td>
+                    <td>${fmt(data.retail, y, null, 'retail', y + ' - Розница')}</td>
+                    <td>${fmt(data.gift, y, null, 'gift', y + ' - Подарки')}</td>
+                </tr>`;
+
+                if (data.months) {
+                    Object.keys(data.months).forEach(m => {
+                        const mData = data.months[m];
+                        const lowerM = m.toLowerCase();
+                        
+                        let saleIcon = ''; let saleColor = '#888';
+                        if (lowerM.includes('дек') || lowerM.includes('янв')) { saleIcon = '❄️'; saleColor = '#66c0f4'; }
+                        else if (lowerM.includes('мар') || lowerM.includes('апр') || lowerM.includes('мая')) { saleIcon = '🌱'; saleColor = '#a4d007'; }
+                        else if (lowerM.includes('июн') || lowerM.includes('июл')) { saleIcon = '☀️'; saleColor = '#ffb01f'; }
+                        else if (lowerM.includes('окт') || lowerM.includes('ноя')) { saleIcon = '🍂'; saleColor = '#e9684c'; }
+
+                        const saleClass = saleIcon ? 'sale-month' : '';
+                        
+                        yearBody.innerHTML += `<tr class="month-row-${y} ${saleClass}" style="display:none; font-size:0.9em; background: rgba(0,0,0,0.3);">
+                            <td style="padding-left: 25px; color: ${saleColor};">
+                                <span class="sale-icon">${saleIcon}</span>${m}
+                            </td>
+                            <td>${fmt(mData.total, y, m, 'total', m + ' ' + y + ' - Все')}</td>
+                            <td>${fmt(mData.store, y, m, 'store', m + ' ' + y + ' - Магазин')}</td>
+                            <td>${fmt(mData.free, y, m, 'free', m + ' ' + y + ' - Бесплатно')}</td>
+                            <td>${fmt(mData.retail, y, m, 'retail', m + ' ' + y + ' - Розница')}</td>
+                            <td>${fmt(mData.gift, y, m, 'gift', m + ' ' + y + ' - Подарки')}</td>
+                        </tr>`;
+                    });
+                }
+            });
+        }
+
+        function toggleMonths(year) {
+            document.querySelectorAll(`.month-row-${year}`).forEach(row => {
+                row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+            });
+        }
+
+        function setFilter(year, month, cat, labelText) {
+            const filterUI = document.getElementById('activeFilter');
+            if (!year && !month && !cat) {
+                filterUI.style.display = 'none';
+                renderHistory(allData);
+                return;
+            }
+
+            filterUI.style.display = 'inline-block';
+            filterUI.querySelector('span').innerText = labelText;
+
+            const filtered = allData.filter(item => {
+                if (!item._parsed) return false;
+                const p = item._parsed;
+                
+                if (year && p.year !== year) return false;
+                if (month && p.month !== month) return false;
+                if (cat && cat !== 'total' && p.category !== cat) return false;
+                return true;
+            });
+            renderHistory(filtered);
+            document.getElementById('activeFilter').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderHistory(dataToRender) {
+            const tbody = document.getElementById('mainTable');
+            tbody.innerHTML = "";
+            
+            if (dataToRender === allData) {
+                document.getElementById('activeFilter').style.display = 'none';
+            }
+
+            dataToRender.forEach(item => {
+                if (!item._parsed) return;
+                const p = item._parsed;
+
+                let tagColor = '#888';
+                let tagLabel = p.originalMethod || 'Неизвестно';
+                
+                if (p.category === 'store') { tagColor = 'var(--steam-blue)'; tagLabel = 'МАГАЗИН'; }
+                else if (p.category === 'free') { tagColor = 'var(--steam-green)'; tagLabel = 'БЕСПЛАТНО'; }
+                else if (p.category === 'retail') { tagColor = 'var(--steam-orange)'; tagLabel = 'РОЗНИЦА'; }
+                else if (p.category === 'gift') { tagColor = 'var(--steam-purple)'; tagLabel = 'ПОДАРОК'; }
+
+                tbody.insertAdjacentHTML('beforeend', `<tr>
+                    <td style="padding-left: 20px; color:#888; font-size: 0.9em;">${item.date}</td>
+                    <td><span class="tag" style="background:${tagColor}">${tagLabel}</span></td>
+                    <td style="font-weight: 500;">${p.cleanName}</td>
+                </tr>`);
+            });
+        }
+    </script>
+</body>
+</html>
